@@ -31,12 +31,24 @@ def test_claim_verifier_verified():
             },
         )
 
-        result = contract.verify_claim(
-            "The Earth orbits the Sun.",
+        claim_id = contract.submit_claim(
+            "The Earth orbits the Sun."
+        )
+
+        contract.add_evidence(
+            claim_id,
             "Astronomical observations show that Earth revolves around the Sun.",
         )
 
+        result = contract.verify_claim(claim_id)
+
         assert result == "VERIFIED"
+
+        claim = contract.get_claim(claim_id)
+
+        assert claim["status"] == "VERIFIED"
+        assert claim["decision"] == "VERIFIED"
+        assert len(claim["evidence"]) == 1
 
 
 def test_claim_verifier_rejected():
@@ -51,12 +63,24 @@ def test_claim_verifier_rejected():
             },
         )
 
-        result = contract.verify_claim(
-            "The Earth is flat.",
+        claim_id = contract.submit_claim(
+            "The Earth is flat."
+        )
+
+        contract.add_evidence(
+            claim_id,
             "Satellite observations show that Earth is approximately spherical.",
         )
 
+        result = contract.verify_claim(claim_id)
+
         assert result == "REJECTED"
+
+        claim = contract.get_claim(claim_id)
+
+        assert claim["status"] == "REJECTED"
+        assert claim["decision"] == "REJECTED"
+        assert len(claim["evidence"]) == 1
 
 
 def test_claim_verifier_insufficient_evidence():
@@ -66,17 +90,29 @@ def test_claim_verifier_insufficient_evidence():
         contract = deploy_with_mock(
             vm,
             {
-                "decision": "REJECTED",
+                "decision": "INSUFFICIENT",
                 "reason": "The evidence is insufficient to support the claim.",
             },
         )
 
-        result = contract.verify_claim(
-            "This company will become the largest company in the world.",
+        claim_id = contract.submit_claim(
+            "This company will become the largest company in the world."
+        )
+
+        contract.add_evidence(
+            claim_id,
             "The company was founded recently.",
         )
 
-        assert result == "REJECTED"
+        result = contract.verify_claim(claim_id)
+
+        assert result == "INSUFFICIENT"
+
+        claim = contract.get_claim(claim_id)
+
+        assert claim["status"] == "INSUFFICIENT"
+        assert claim["decision"] == "INSUFFICIENT"
+
 
 def test_claim_verifier_consistency():
     vm = VMContext()
@@ -90,12 +126,34 @@ def test_claim_verifier_consistency():
             },
         )
 
-        claim = "Water freezes at 0 degrees Celsius under standard atmospheric pressure."
-        evidence = "Under standard atmospheric pressure, water freezes at 0 degrees Celsius."
+        claim = (
+            "Water freezes at 0 degrees Celsius "
+            "under standard atmospheric pressure."
+        )
 
-        results = [
-            contract.verify_claim(claim, evidence)
-            for _ in range(5)
+        evidence = (
+            "Under standard atmospheric pressure, "
+            "water freezes at 0 degrees Celsius."
+        )
+
+        results = []
+
+        for _ in range(5):
+            claim_id = contract.submit_claim(claim)
+
+            contract.add_evidence(
+                claim_id,
+                evidence,
+            )
+
+            results.append(
+                contract.verify_claim(claim_id)
+            )
+
+        assert results == [
+            "VERIFIED",
+            "VERIFIED",
+            "VERIFIED",
+            "VERIFIED",
+            "VERIFIED",
         ]
-
-        assert results == ["VERIFIED"] * 5
